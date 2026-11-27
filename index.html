@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>RP1 · NAAC-X tracker · connection test</title>
+<link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="head">
+    <div>
+      <div class="kicker">RP-1 career · NAAC-X · v0.1.1</div>
+      <h1>Tracker backend: connection test</h1>
+    </div>
+    <div class="who" id="who" hidden><span id="who-email"></span><button type="button" class="btn" id="signout">Sign out</button></div>
+  </header>
+
+  <section class="card" id="gate">
+    <h2>Sign in</h2>
+    <p class="note">This tracker is private. Sign in with the Google account that owns the NAAC-X folder.</p>
+    <div id="gsi" class="gsi"></div>
+    <p class="msg" id="gate-msg"></p>
+  </section>
+
+  <div id="app" hidden>
+  <p class="note">This page checks that GitHub can talk to your Apps Script and Sheet. The tracker pages replace it in v0.2.0.</p>
+  <section class="card" id="connect">
+    <h2>1 · Connect</h2>
+    <div class="row">
+      <label class="field" id="url-field">Apps Script web app URL (ends in /exec)<input id="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec"></label>
+      <label class="field">Key (from the setup log)<input id="key" type="password" autocomplete="off" spellcheck="false"></label>
+      <button type="button" class="btn primary" id="save">Save</button>
+      <button type="button" class="btn" id="forget">Forget</button>
+    </div>
+    <p class="note" id="connect-note">The key is kept in this browser only. Nothing secret is stored in the repo.</p>
+    <p class="msg" id="connect-msg"></p>
+  </section>
+
+  <section class="card">
+    <h2>2 · Tests (run top to bottom)</h2>
+    <div class="tests" id="tests"></div>
+  </section>
+  </div>
+</main>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+(function () {
+  const api = window.RP1.api;
+  const auth = window.RP1.auth;
+  const $ = (id) => document.getElementById(id);
+  const say = (el, text, cls) => { el.textContent = text; el.className = 'msg' + (cls ? ' ' + cls : ''); };
+  auth.start({
+    button: $('gsi'),
+    onSignedIn(email) { $('gate').hidden = true; $('app').hidden = false; $('who').hidden = false; $('who-email').textContent = email; },
+    onSignedOut(msg) { $('gate').hidden = false; $('app').hidden = true; $('who').hidden = true; say($('gate-msg'), msg || '', /expired|again|out/i.test(msg || '') ? '' : 'bad'); },
+  });
+  $('signout').addEventListener('click', () => auth.signOut());
+  if (api.urlFromConfig) { $('url-field').hidden = true; }
+  $('url').value = api.urlFromConfig ? '' : api.url; $('key').value = api.key;
+  say($('connect-msg'), api.ready ? 'Saved in this browser. Run the tests below.' : 'Not connected yet: paste your key and press Save.', api.ready ? 'ok' : '');
+  $('save').addEventListener('click', () => {
+    const u = api.urlFromConfig ? api.url : $('url').value.trim(); const k = $('key').value.trim();
+    if (!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(u)) { say($('connect-msg'), 'That URL doesn’t look right. It should start with https://script.google.com/macros/s/ and end with /exec.', 'bad'); return; }
+    if (!k) { say($('connect-msg'), 'Paste the key from the setup log.', 'bad'); return; }
+    api.save(u, k); say($('connect-msg'), 'Saved in this browser. Run the tests below.', 'ok');
+  });
+  $('forget').addEventListener('click', () => { api.forget(); $('url').value = ''; $('key').value = ''; say($('connect-msg'), 'Forgotten. This browser no longer has the key.', ''); });
+
+  const TEST_ID = 'test_v011';
+  let newestCsv = null;
+  const tests = [
+    ['Ping', async () => {
+      const r = await api.ping();
+      return { text: `Connected as ${auth.email}. Backend v${r.version}.\nSheet: ${r.sheetUrl}\nTabs (${r.tabs.length}): ${r.tabs.join(', ')}`, link: r.sheetUrl };
+    }],
+    ['Check Sheet layout', async () => {
+      const r = await api.setup();
+      return { text: r.created.length ? `Added missing tabs: ${r.created.join(', ')}` : `All ${r.tabs.length} tabs present with their headers.` };
+    }],
+    ['Write a test flight', async () => {
+      const r = await api.write([
+        { op: 'upsert', tab: 'Flights', rows: [{ flightId: TEST_ID, mission: 'Connection test', missionType: 'sounding', status: 'Success', needsReview: true, launchDate: '1951-02-16', launchTime: '14:52', duration: '00:00:02:13', maxAlt: 11715, downrange: '35.4', payloadUnits: '75So', failures: [{ part: 'Test part', type: 'Ignition', met: 3 }], src: { mission: 'YOU', maxAlt: 'TLM' } }] },
+        { op: 'replaceChildren', tab: 'Flight engines', parentId: TEST_ID, rows: [{ stage: 'B', engine: '30Klbf', duStart: 0, duEnd: 12.5, runTime: 3.2, ignition: 98, reliability: 95 }, { stage: 'S', engine: 'WAC-Corporal', duStart: 0, duEnd: 40, runTime: 45, ignition: 96, reliability: 92 }] },
+        { op: 'upsert', tab: 'Profile - Sounding', rows: [{ flightId: TEST_ID, targetAlt: 10000, records: 'test' }] },
+      ]);
+      return { text: `Written: ${r.summary.join(' · ')}${r.warnings.length ? `\nNote: ${r.warnings.join('; ')}` : ''}\nOpen the Sheet to see the rows if you like, then run the next test.` };
+    }],
+    ['Read it back', async () => {
+      const d = await api.read(['Flights', 'Flight engines', 'Profile - Sounding']);
+      const f = d.Flights.find((x) => x.flightId === TEST_ID);
+      if (!f) throw new Error('The test flight wasn’t found. Run "Write a test flight" first.');
+      const eng = d['Flight engines'].filter((x) => x.flightId === TEST_ID);
+      const prof = d['Profile - Sounding'].find((x) => x.flightId === TEST_ID);
+      const checks = [
+        ['launch date kept as text', f.launchDate === '1951-02-16'],
+        ['launch time kept as text', f.launchTime === '14:52'],
+        ['duration kept as text', f.duration === '00:00:02:13'],
+        ['max altitude is a number', f.maxAlt === 11715],
+        ['downrange turned into a number', f.downrange === 35.4],
+        ['payload units kept ("75So")', f.payloadUnits === '75So'],
+        ['needs-review flag kept', f.needsReview === true],
+        ['failures list kept', Array.isArray(f.failures) && f.failures[0] && f.failures[0].part === 'Test part'],
+        ['source tags kept', f.src && f.src.maxAlt === 'TLM'],
+        ['2 engine rows', eng.length === 2 && eng[1].engine === 'WAC-Corporal' && eng[1].reliability === 92],
+        ['sounding profile row', !!prof && prof.targetAlt === 10000],
+      ];
+      const bad = checks.filter((c) => !c[1]);
+      return { text: checks.map((c) => `${c[1] ? '✓' : '✗'} ${c[0]}`).join('\n'), cls: bad.length ? 'bad' : 'ok' };
+    }],
+    ['Delete the test flight', async () => {
+      const r = await api.write([
+        { op: 'delete', tab: 'Flights', ids: [TEST_ID] },
+        { op: 'replaceChildren', tab: 'Flight engines', parentId: TEST_ID, rows: [] },
+        { op: 'delete', tab: 'Profile - Sounding', ids: [TEST_ID] },
+      ]);
+      return { text: `${r.summary.join(' · ')}. The Sheet should be back to headers only.` };
+    }],
+    ['List Craft files', async () => {
+      const files = await api.listFiles('craft');
+      return { text: files.length ? `${files.length} file(s):\n${files.slice(0, 15).map((f) => `${f.name} · ${f.modified.slice(0, 10)}`).join('\n')}` : 'The Craft folder is empty.' };
+    }],
+    ['List CSV Export files', async () => {
+      const files = await api.listFiles('csv');
+      newestCsv = files.find((f) => /\.csv$/i.test(f.name)) || null;
+      return { text: files.length ? `${files.length} file(s):\n${files.slice(0, 15).map((f) => `${f.name} · ${f.modified.slice(0, 10)}`).join('\n')}` : 'The CSV Export folder is empty.' };
+    }],
+    ['Read the newest CSV', async () => {
+      if (!newestCsv) throw new Error('No CSV found. Run "List CSV Export files" first, or add a CSV to the folder.');
+      const r = await api.readFile(newestCsv.id);
+      const lines = r.text.split(/\r?\n/).filter((l) => l.trim());
+      return { text: `${r.name}: ${lines.length - 1} data rows.\nFirst columns: ${lines[0].split(',').slice(0, 5).join(', ')} …`, cls: /^Time,/.test(lines[0]) ? 'ok' : 'warn' };
+    }],
+  ];
+  const box = $('tests');
+  tests.forEach(([label, fn]) => {
+    const row = document.createElement('div'); row.className = 'test';
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = label;
+    const out = document.createElement('div'); out.className = 'msg';
+    b.addEventListener('click', async () => {
+      b.disabled = true; say(out, 'Working… (the script can take a few seconds)');
+      const t0 = performance.now();
+      try {
+        const r = await fn();
+        say(out, `${r.text}\n(${((performance.now() - t0) / 1000).toFixed(1)} s)`, r.cls || 'ok');
+        if (r.link) { const a = document.createElement('a'); a.href = r.link; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Open the Sheet'; out.append(document.createElement('br'), a); }
+      } catch (e) { say(out, e.message || String(e), 'bad'); }
+      b.disabled = false;
+    });
+    row.append(b, out); box.append(row);
+  });
+})();
+</script>
+</body>
+</html>

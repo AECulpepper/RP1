@@ -1,0 +1,29 @@
+:root{--bg:#f6f5f1;--panel:#fff;--fg:#1f1e1b;--muted:#6b6862;--line:#dedbd3;--ok:#2f7d4f;--bad:#b3402e;--warn:#a36a00;--accent:#1f1e1b;--accent-fg:#fff;--radius:8px;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#1b1a18;--panel:#242320;--fg:#ecebe6;--muted:#a19e96;--line:#3a3833;--ok:#5cb784;--bad:#e2725f;--warn:#e0a33a;--accent:#ecebe6;--accent-fg:#1b1a18}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font)}
+.wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px;display:flex;flex-direction:column;gap:18px}
+.kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{margin:2px 0 0;font-weight:500;font-size:26px}
+h2{margin:0 0 10px;font-size:17px;font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:18px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);flex:1 1 260px;min-width:0}
+.field input{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;width:100%}
+.btn{font:inherit;padding:8px 14px;border-radius:var(--radius);border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;min-height:40px}
+.btn:disabled{opacity:.45;cursor:default}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.note{color:var(--muted);font-size:13px;margin:6px 0 0}
+.msg{font-size:14px;margin:8px 0 0;min-height:1.2em;white-space:pre-wrap;overflow-wrap:anywhere}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.tests{display:flex;flex-direction:column;gap:0}
+.test{display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:12px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}
+.test:first-child{border-top:0}
+.test .btn{width:100%;text-align:left}
+a{color:inherit}
+code{font-size:13px;background:var(--bg);padding:1px 5px;border-radius:4px}
+@media (max-width:600px){.test{grid-template-columns:1fr}}
+.head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px}
+.who{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.gsi{margin-top:12px;min-height:44px}
+[hidden]{display:none!important}
